@@ -11,6 +11,10 @@
     {
       "name": "Honza Krakora",
       "email": "krakora.jan@googlemail.com"
+    },
+    {
+      "name": "Ondřej Hruška",
+      "email": "ondra@ondrovo.com"
     }
   ],
   "autoload": {
