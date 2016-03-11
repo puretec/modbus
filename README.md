@@ -8,6 +8,8 @@ This is a fork of the original project at https://code.google.com/p/phpmodbus/
 > 
 > This fork adds a namespace and fixes issues encountered when porting to PHP 7
 
+**WARNING: Everything except the actual code in this repo may be broken and outdated.**
+
 Implemented features:
  * Modbus master
   * FC1 - Read coils 
