@@ -59,6 +59,14 @@ class ModbusMaster
 
 	public $timeout_sec = 5; // Timeout 5 sec
 
+	public $timeout_usec = 0; // is added to $timeout_sec when calculating real read timeout
+
+	public $socket_read_timeout_usec = 300000; // socket read timeout 300 ms
+
+	public $socket_write_timeout_sec = 1; // socket write timeout 1 sec
+
+	public $socket_write_timeout_usec = 0; // socket write timeout microseconds (must be lower than 1 sec e.g. 1000000)
+
 	public $endianness = 0; // Endianness codding (little endian == 0, big endian == 1)
 
 	public $socket_protocol = "UDP"; // Socket protocol (TCP, UDP)
@@ -117,8 +125,10 @@ class ModbusMaster
 				$this->status .= "Bound\n";
 			}
 		}
-		// Socket settings
-		socket_set_option($this->sock, SOL_SOCKET, SO_SNDTIMEO, array('sec' => 1, 'usec' => 0));
+		// Socket settings (send/write timeout)
+		socket_set_option($this->sock, SOL_SOCKET, SO_SNDTIMEO,
+			array('sec' => $this->socket_write_timeout_sec, 'usec' => $this->socket_write_timeout_usec)
+		);
 		// Connect the socket
 		$result = @socket_connect($this->sock, $this->host, $this->port);
 		if ($result === false) {
@@ -169,19 +179,21 @@ class ModbusMaster
 		$writesocks = null;
 		$exceptsocks = null;
 		$rec = "";
-		$lastAccess = time();
-		while (socket_select($readsocks, $writesocks, $exceptsocks, 0, 300000) !== false) {
-			$this->status .= "Wait data ... \n";
+		$timeoutInSeconds = $this->timeout_sec + ($this->timeout_usec / 1000000);
+		$lastAccess = microtime(true);
+		while (socket_select($readsocks, $writesocks, $exceptsocks, 0, $this->socket_read_timeout_usec) !== false) {
+			$this->status .= "Wait data ... " . PHP_EOL;
 			if (in_array($this->sock, $readsocks)) {
 				while (@socket_recv($this->sock, $rec, 2000, 0)) {
-					$this->status .= "Data received\n";
+					$this->status .= "Data received" . PHP_EOL;
 					return $rec;
 				}
-				$lastAccess = time();
+				$lastAccess = microtime(true);
 			} else {
-				if (time() - $lastAccess >= $this->timeout_sec) {
+				$usecSpentWaiting = microtime(true) - $lastAccess;
+				if ($usecSpentWaiting >= $timeoutInSeconds) {
 					throw new Exception("Watchdog time expired [ " .
-						$this->timeout_sec . " sec]!!! Connection to " .
+						$timeoutInSeconds . " sec]!!! Connection to " .
 						$this->host . " is not established.");
 				}
 			}
