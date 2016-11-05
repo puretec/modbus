@@ -59,7 +59,7 @@ class ModbusMaster
 
 	public $timeout_sec = 5; // Timeout 5 sec
 
-	public $timeout_usec = 0; // is added to $timeout_sec when calculating real read timeout
+	public $timeout_msec = 0; // milliseconds. is added to $timeout_sec when calculating real read timeout
 
 	public $socket_read_timeout_usec = 300000; // socket read timeout 300 ms
 
@@ -179,8 +179,9 @@ class ModbusMaster
 		$writesocks = null;
 		$exceptsocks = null;
 		$rec = "";
-		$timeoutInSeconds = $this->timeout_sec + ($this->timeout_usec / 1000000);
+		$timeoutInSeconds = $this->timeout_sec + ($this->timeout_msec / 1000);
 		$lastAccess = microtime(true);
+		echo $lastAccess . PHP_EOL;
 		while (socket_select($readsocks, $writesocks, $exceptsocks, 0, $this->socket_read_timeout_usec) !== false) {
 			$this->status .= "Wait data ... " . PHP_EOL;
 			if (in_array($this->sock, $readsocks)) {
@@ -190,8 +191,9 @@ class ModbusMaster
 				}
 				$lastAccess = microtime(true);
 			} else {
-				$usecSpentWaiting = microtime(true) - $lastAccess;
-				if ($usecSpentWaiting >= $timeoutInSeconds) {
+				$timeSpentWaiting = microtime(true) - $lastAccess;
+				if ($timeSpentWaiting >= $timeoutInSeconds) {
+					echo $timeoutInSeconds . PHP_EOL;
 					throw new Exception("Watchdog time expired [ " .
 						$timeoutInSeconds . " sec]!!! Connection to " .
 						$this->host . " is not established.");
@@ -1384,5 +1386,18 @@ class ModbusMaster
 		}
 		$str .= "\n";
 		return $str;
+	}
+
+	/**
+	 * setTimeoutMs
+	 *
+	 * Set timeout used when receiving data in milliseconds. NB: Method overrides $timeout_sec variable value.
+	 *
+	 * @param integer $milliseconds milliseconds
+	 */
+	public function setTimeoutMs($milliseconds)
+	{
+		$this->timeout_sec = 0;
+		$this->timeout_msec = $milliseconds;
 	}
 }
