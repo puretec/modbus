@@ -181,7 +181,6 @@ class ModbusMaster
 		$rec = "";
 		$timeoutInSeconds = $this->timeout_sec + ($this->timeout_msec / 1000);
 		$lastAccess = microtime(true);
-		echo $lastAccess . PHP_EOL;
 		while (socket_select($readsocks, $writesocks, $exceptsocks, 0, $this->socket_read_timeout_usec) !== false) {
 			$this->status .= "Wait data ... " . PHP_EOL;
 			if (in_array($this->sock, $readsocks)) {
@@ -193,7 +192,6 @@ class ModbusMaster
 			} else {
 				$timeSpentWaiting = microtime(true) - $lastAccess;
 				if ($timeSpentWaiting >= $timeoutInSeconds) {
-					echo $timeoutInSeconds . PHP_EOL;
 					throw new Exception("Watchdog time expired [ " .
 						$timeoutInSeconds . " sec]!!! Connection to " .
 						$this->host . " is not established.");
