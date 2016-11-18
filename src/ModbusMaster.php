@@ -45,31 +45,38 @@ use Exception;
  */
 class ModbusMaster
 {
+	/** @var resource Communication socket */
 	private $sock;
 
+	/** @var string Modbus device IP address */
 	public $host = "192.168.1.1";
 
-	public $port = "502";
+	/** @var string gateway port */
+	public $port = 502;
 
-	public $client = "";
+	/** @var string (optional) client IP address */
+	public $client = ""; // TODO explanation?
 
-	public $client_port = "502";
+	/** @var string client port */
+	public $client_port = 502;
 
+	/** @var string ModbusMaster status messages (echo for debugging) */
 	public $status;
 
-	public $timeout_sec = 5; // Timeout 5 sec
+	/** @var float Total response timeout (seconds, decimals allowed) */
+	public $timeout_sec = 5;
 
-	public $timeout_msec = 0; // milliseconds. is added to $timeout_sec when calculating real read timeout
+	/** @var float Socket read timeout (seconds, decimals allowed) */
+	public $socket_read_timeout_sec = 0.3; // 300 ms
 
-	public $socket_read_timeout_usec = 300000; // socket read timeout 300 ms
+	/** @var float Socket write timeout (seconds, decimals allowed) */
+	public $socket_write_timeout_sec = 1;
 
-	public $socket_write_timeout_sec = 1; // socket write timeout 1 sec
+	/** @var int Endianness codding (0 = little endian = 0, 1 = big endian) */
+	public $endianness = 0; //
 
-	public $socket_write_timeout_usec = 0; // socket write timeout microseconds (must be lower than 1 sec e.g. 1000000)
-
-	public $endianness = 0; // Endianness codding (little endian == 0, big endian == 1)
-
-	public $socket_protocol = "UDP"; // Socket protocol (TCP, UDP)
+	/** @var string Socket protocol (TCP, UDP) */
+	public $socket_protocol = "UDP";
 
 	/**
 	 * ModbusMaster
@@ -96,6 +103,22 @@ class ModbusMaster
 	}
 
 	/**
+	 * Convert float in seconds to array
+	 *
+	 * @param float $secs
+	 * @return array {sec: ..., usec: ...}
+	 */
+	private function secsToSecUsecArray($secs)
+	{
+		$remainder = $secs - floor($secs);
+
+		return [
+			'sec' => round($secs - $remainder),
+			'usec' => round($remainder * 1e6),
+		];
+	}
+
+	/**
 	 * connect
 	 *
 	 * Connect the socket
@@ -119,20 +142,21 @@ class ModbusMaster
 		if (strlen($this->client) > 0) {
 			$result = socket_bind($this->sock, $this->client, $this->client_port);
 			if ($result === false) {
-				throw new Exception("socket_bind() failed.</br>Reason: ($result)" .
+				throw new Exception("socket_bind() failed. Reason: ($result)" .
 					socket_strerror(socket_last_error($this->sock)));
 			} else {
 				$this->status .= "Bound\n";
 			}
 		}
+
 		// Socket settings (send/write timeout)
-		socket_set_option($this->sock, SOL_SOCKET, SO_SNDTIMEO,
-			array('sec' => $this->socket_write_timeout_sec, 'usec' => $this->socket_write_timeout_usec)
-		);
+		$writeTimeout = $this->secsToSecUsecArray($this->socket_write_timeout_sec);
+		socket_set_option($this->sock, SOL_SOCKET, SO_SNDTIMEO, $writeTimeout);
+
 		// Connect the socket
 		$result = @socket_connect($this->sock, $this->host, $this->port);
 		if ($result === false) {
-			throw new Exception("socket_connect() failed.</br>Reason: ($result)" .
+			throw new Exception("socket_connect() failed. Reason: ($result)" .
 				socket_strerror(socket_last_error($this->sock)));
 		} else {
 			$this->status .= "Connected\n";
@@ -179,22 +203,24 @@ class ModbusMaster
 		$writesocks = null;
 		$exceptsocks = null;
 		$rec = "";
-		$timeoutInSeconds = $this->timeout_sec + ($this->timeout_msec / 1000);
+		$totalReadTimeout = $this->timeout_sec;
 		$lastAccess = microtime(true);
-		while (socket_select($readsocks, $writesocks, $exceptsocks, 0, $this->socket_read_timeout_usec) !== false) {
-			$this->status .= "Wait data ... " . PHP_EOL;
+		$readTout = $this->secsToSecUsecArray($this->socket_read_timeout_sec);
+
+		while (false !== socket_select($readsocks, $writesocks, $exceptsocks, $readTout['sec'], $readTout['usec'])) {
+			$this->status .= "Wait data ... \n";
 			if (in_array($this->sock, $readsocks)) {
-				while (@socket_recv($this->sock, $rec, 2000, 0)) {
-					$this->status .= "Data received" . PHP_EOL;
+				if (@socket_recv($this->sock, $rec, 2000, 0)) { // read max 2000 bytes
+					$this->status .= "Data received \n";
 					return $rec;
 				}
 				$lastAccess = microtime(true);
 			} else {
 				$timeSpentWaiting = microtime(true) - $lastAccess;
-				if ($timeSpentWaiting >= $timeoutInSeconds) {
-					throw new Exception("Watchdog time expired [ " .
-						$timeoutInSeconds . " sec]!!! Connection to " .
-						$this->host . " is not established.");
+				if ($timeSpentWaiting >= $totalReadTimeout) {
+					throw new Exception(
+						"Watchdog time expired [ $totalReadTimeout sec ]!!! " .
+						"Connection to $this->host:$this->port is not established.");
 				}
 			}
 			$readsocks[] = $this->sock;
@@ -227,7 +253,7 @@ class ModbusMaster
 				0x06 => "SLAVE DEVICE BUSY",
 				0x08 => "MEMORY PARITY ERROR",
 				0x0A => "GATEWAY PATH UNAVAILABLE",
-				0x0B => "GATEWAY TARGET DEVICE FAILED TO RESPOND"
+				0x0B => "GATEWAY TARGET DEVICE FAILED TO RESPOND",
 			);
 			// get failure string
 			if (key_exists($failure_code, $failures)) {
@@ -1289,7 +1315,8 @@ class ModbusMaster
 		$referenceWrite,
 		$data,
 		$dataTypes
-	) {
+	)
+	{
 		$dataLen = 0;
 		// build data section
 		$buffer1 = "";
@@ -1336,7 +1363,7 @@ class ModbusMaster
 	 * FC23 response parser
 	 *
 	 * @param string $packet
-	 * @return array
+	 * @return array|false
 	 */
 	private function readWriteRegistersParser($packet)
 	{
@@ -1387,15 +1414,33 @@ class ModbusMaster
 	}
 
 	/**
-	 * setTimeoutMs
+	 * Set data receive timeout.
+	 * Writes property timeout_sec
 	 *
-	 * Set timeout used when receiving data in milliseconds. NB: Method overrides $timeout_sec variable value.
-	 *
-	 * @param integer $milliseconds milliseconds
+	 * @param float $seconds seconds
 	 */
-	public function setTimeoutMs($milliseconds)
+	public function setTimeout($seconds)
 	{
-		$this->timeout_sec = 0;
-		$this->timeout_msec = $milliseconds;
+		$this->timeout_sec = $seconds;
+	}
+
+	/**
+	 * Set socket read/write timeout. Null = no change.
+	 *
+	 * @param float|null $read_timeout_sec data read timeout (seconds, default 0.3)
+	 * @param float|null $write_timeout_sec data write timeout (seconds, default 1.0)
+	 * @internal param float $seconds seconds
+	 */
+	public function setSocketTimeout($read_timeout_sec, $write_timeout_sec)
+	{
+		// Set read timeout if given
+		if ($read_timeout_sec !== null) {
+			$this->socket_read_timeout_sec = $read_timeout_sec;
+		}
+
+		// Set write timeout if given
+		if ($write_timeout_sec !== null) {
+			$this->socket_write_timeout_sec = $write_timeout_sec;
+		}
 	}
 }
