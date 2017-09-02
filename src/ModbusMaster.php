@@ -209,7 +209,7 @@ class ModbusMaster
 		$readTout = $this->secsToSecUsecArray($this->socket_read_timeout_sec);
 		while (false !== socket_select($readsocks, $writesocks, $exceptsocks, $readTout['sec'], $readTout['usec'])) {
 			if (in_array($this->sock, $readsocks)) {
-				if ($recn = @socket_recv($this->sock, $rec, 2000, 0)) { // read max 2000 bytes
+				if (@socket_recv($this->sock, $rec, 2000, 0)) { // read max 2000 bytes
 					$this->status .= "Data received \n";
 					return $rec;
 				}
