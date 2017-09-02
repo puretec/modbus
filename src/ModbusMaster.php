@@ -64,7 +64,7 @@ class ModbusMaster
 	public $status;
 
 	/** @var float Total response timeout (seconds, decimals allowed) */
-	public $timeout_sec = 5;
+	public $timeout_sec = 3;
 
 	/** @var float Socket read timeout (seconds, decimals allowed) */
 	public $socket_read_timeout_sec = 0.3; // 300 ms
@@ -205,16 +205,18 @@ class ModbusMaster
 		$rec = "";
 		$totalReadTimeout = $this->timeout_sec;
 		$lastAccess = microtime(true);
+		$readStart = microtime(true);
 		$readTout = $this->secsToSecUsecArray($this->socket_read_timeout_sec);
-
 		while (false !== socket_select($readsocks, $writesocks, $exceptsocks, $readTout['sec'], $readTout['usec'])) {
-			$this->status .= "Wait data ... \n";
 			if (in_array($this->sock, $readsocks)) {
-				if (@socket_recv($this->sock, $rec, 2000, 0)) { // read max 2000 bytes
+				if ($recn = @socket_recv($this->sock, $rec, 2000, 0)) { // read max 2000 bytes
 					$this->status .= "Data received \n";
 					return $rec;
 				}
 				$lastAccess = microtime(true);
+				if (microtime(true) - $readStart > $totalReadTimeout) {
+					throw new Exception("Read timed out, last error: " . socket_strerror(socket_last_error($this->sock)));
+				}
 			} else {
 				$timeSpentWaiting = microtime(true) - $lastAccess;
 				if ($timeSpentWaiting >= $totalReadTimeout) {
