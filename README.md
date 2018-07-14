@@ -2,7 +2,7 @@
 
 Implementation of the basic functionality of the Modbus TCP and UDP based protocol using PHP. 
 
-**NOTE: This is a fork to fix & update the library code (and code alone). Notably, the tests are probably all broken.**
+**NOTE: This is a fork to fix & update the library code.**
 
 > **What's new**
 > 
@@ -31,8 +31,8 @@ Implementation of the basic functionality of the Modbus TCP and UDP based protoc
 ## Example
 
 ```php
-use PHPModbus/ModbusMaster; 
-use PHPModbus/PhpType; 
+use MightyPork\PHPModbus\ModbusMaster; 
+use MightyPork\PHPModbus\PhpType; 
 
 // Modbus master UDP
 $modbus = new ModbusMaster("192.168.1.1", "UDP"); 
@@ -41,7 +41,7 @@ try {
     $recData = $modbus->readMultipleRegisters(0, 12288, 5); 
 } catch (Exception $e) {
     // Print error information if any
-    echo $modbus;
+    echo $modbus . "\n";
     echo $e;
     exit;
 }
@@ -51,12 +51,12 @@ echo PhpType::bytes2string($recData);
 
 Use the `setTimeout($seconds)` and `setSocketTimeout($read_timeout_sec, $write_timeout_sec)` methods to adjust wait times.
 
-Most of the code is (to some extent) commented and documented with PhpDoc. You should get useful tooltips in your IDE.
+Most of the code is (to some extent) commented and documented with PhpDoc.
 
 
 ## GoogleCode legacy docs & downloads
 
-This project was originally hosted on (now defunct) Google Code. It's still archived here:
+This project was originally hosted on Google Code. It is still archived here:
 
 * [GoogleCode Archived Repo](http://code.google.com/p/phpmodbus)
 
