@@ -31,8 +31,8 @@ Implementation of the basic functionality of the Modbus TCP and UDP based protoc
 ## Example
 
 ```php
-use MightyPork\PHPModbus\ModbusMaster; 
-use MightyPork\PHPModbus\PhpType; 
+use PHPModbus\ModbusMaster; 
+use PHPModbus\PhpType; 
 
 // Modbus master UDP
 $modbus = new ModbusMaster("192.168.1.1", "UDP"); 
